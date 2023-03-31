@@ -79,6 +79,9 @@ function nextTrack(id){
 		player.setPlayerKey("isPlaying",false);
 		player.getPlayerKey("playerProcess").kill();
 		player.setPlayerKey("playerProcess",undefined);
+		if(platform==="windows"){
+			child_process.exec("taskkill -f -im wscript.exe");
+		}
 	}
 	const tracks=player.getPlayerKey("tracks");
 	let trackIndex=player.getPlayerKey("trackIndex");
@@ -99,6 +102,9 @@ function pause(id){
 		player.setPlayerKey("isPlaying",false);
 		player.getPlayerKey("playerProcess").kill();
 		player.setPlayerKey("playerProcess",undefined);
+		if(platform==="windows"){
+			child_process.exec("taskkill -f -im wscript.exe");
+		}
 	}
 	
 }
