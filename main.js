@@ -35,6 +35,8 @@ function play(id){
 	const trackIndex=player.getPlayerKey("trackIndex");
 	const track=tracks[trackIndex];
 
+	console.log(`Playing: ${track.name?track.name:track.src}`);
+
 	if(platform==="windows"){
 		const fileName=`_player_${Date.now()}.vbs`
 		fs.writeFileSync(fileName,`\
@@ -69,8 +71,6 @@ function play(id){
 		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
 			process.stdout.write(buffer);
 		});
-
-		console.log(`Playing: ${track.name?track.name:track.src}`);
 	}
 }
 function nextTrack(id){
@@ -143,6 +143,21 @@ function createPlayer(){
 	};
 	return playerCommands;
 }
+function shutdown(){
+	console.log("Stopping playback ...");
+	for(const player of players){
+		if(player.getPlayerKey("isPlaying")){
+			player.setPlayerKey("isPlaying",false);
+			player.getPlayerKey("playerProcess").kill();
+			player.setPlayerKey("playerProcess",undefined);
+		}
+	}
+}
+
+process.on('exit',shutdown);
+process.on('SIGINT',shutdown);
+process.on('SIGUSR1',shutdown);
+process.on('SIGUSR2',shutdown);
 
 module.exports={
 	createPlayer,
