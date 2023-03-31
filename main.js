@@ -37,7 +37,7 @@ function play(id){
 		const track=tracks[trackIndex];
 
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
-			track.src,"-softvol","-softvol-max","100","-af","volume=0",
+			track.src,"-softvol","-softvol-max","90","-af","volume=0",
 		]));
 		player.getPlayerKey("playerProcess").on("exit",code=>{
 			player.setPlayerKey("playerProcess",undefined);
