@@ -64,7 +64,8 @@ function play(id){
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
 			track.src,"-softvol","-softvol-max","90",
 		]));
-		player.getPlayerKey("playerProcess").on("exit",code=>{
+		player.getPlayerKey("playerProcess").on("exit",(code,signal)=>{
+			console.log("mplayer exit code "+code+" and signal "+signal);
 			player.setPlayerKey("playerProcess",undefined);
 			if(player.getPlayerKey("isPlaying")){
 				player.setPlayerKey("isPlaying",false);
