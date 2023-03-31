@@ -30,8 +30,11 @@ function play(id){
 	}
 	player.setPlayerKey("isPlaying",true);
 
-	const src=player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")];
 	const tracks=player.getPlayerKey("tracks");
+	if(tracks.length===0){
+		console.warn("Keine Wiedergabe möglich Warteschlange leer!");
+		return;
+	}
 	const trackIndex=player.getPlayerKey("trackIndex");
 	const track=tracks[trackIndex];
 
