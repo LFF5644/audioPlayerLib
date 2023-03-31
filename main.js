@@ -23,7 +23,6 @@ function addTrack(id,object){
 }
 function play(id){
 	const player=players[id];
-	console.log("this is coming later... o_o");
 	if(player.getPlayerKey("isPlaying")){
 		return false;
 	}
@@ -45,6 +44,11 @@ function play(id){
 				player.nextTrack();
 			}
 		});
+		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
+			process.stdout.write(buffer);
+		});
+
+		console.log(`Playing: ${track.name?track.name:track.src}`);
 	}
 }
 function nextTrack(id){
