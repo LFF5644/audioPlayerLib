@@ -1,5 +1,5 @@
 # Audio Player Lib
-a audio player in nodejs for linux
+a audio player in nodejs for linux and windows (other platforms are not tested)
 
 you need nodejs and for linux you need [`mplayer`](http://www.mplayerhq.hu/design7/news.html) at `/usr/bin/mplayer`
 
