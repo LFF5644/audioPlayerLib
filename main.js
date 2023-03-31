@@ -1,4 +1,5 @@
 const child_process=require("child_process");
+const fs=require("fs");
 const players={};
 const trackTemplate={
 	id: null,
@@ -28,15 +29,33 @@ function play(id){
 		return false;
 	}
 	player.setPlayerKey("isPlaying",true);
+
 	const src=player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")];
+	const tracks=player.getPlayerKey("tracks");
+	const trackIndex=player.getPlayerKey("trackIndex");
+	const track=tracks[trackIndex];
+
 	if(platform==="windows"){
-		throw new Error("Windows is not allowed ....");
+		const fileName=`_player_${Date.now()}.vbs`
+		fs.writeFileSync(fileName,`\
+			Set Sound=CreateObject("WMPlayer.OCX.7")
+			Sound.URL="${track.src}"
+			Sound.Controls.play
+			do while Sound.currentmedia.duration=0
+			wscript.sleep 100
+			loop
+			wscript.sleep(int(Sound.currentmedia.duration)+1)*1000\
+		`.split("\t").join(""));
+		player.setPlayerKey("playerProcess",child_process.exec("start \"\" /wait "+fileName,(error,stdout,stderr)=>{
+			child_process.exec(`del /Q /F "${fileName}"`);
+			player.setPlayerKey("playerProcess",undefined);
+			if(player.getPlayerKey("isPlaying")){
+				player.setPlayerKey("isPlaying",false);
+				player.nextTrack();
+			}
+		}));
 	}
 	else{
-		const tracks=player.getPlayerKey("tracks");
-		const trackIndex=player.getPlayerKey("trackIndex");
-		const track=tracks[trackIndex];
-
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
 			track.src,"-softvol","-softvol-max","90",
 		]));
