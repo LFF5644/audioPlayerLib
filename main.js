@@ -59,7 +59,9 @@ function play(id){
 				player.nextTrack();
 			}
 		}));
-		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{});
+		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
+			process.stdout.write(buffer);
+		});
 	}
 	else{
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
