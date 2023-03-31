@@ -48,7 +48,7 @@ function play(id){
 			loop
 			wscript.sleep(int(Sound.currentmedia.duration)+1)*1000\
 		`.split("\t").join(""));
-		player.setPlayerKey("playerProcess",child_process.exec("start \"\" /wait "+fileName,(error,stdout,stderr)=>{
+		player.setPlayerKey("playerProcess",child_process.exec("start \"\" /wait C:\\Windows\\System32\\wscript.exe "+fileName,(error,stdout,stderr)=>{
 			child_process.exec(`del /Q /F "${fileName}"`);
 			player.setPlayerKey("playerProcess",undefined);
 			if(player.getPlayerKey("isPlaying")){
@@ -151,6 +151,9 @@ function shutdown(){
 			player.setPlayerKey("isPlaying",false);
 			player.getPlayerKey("playerProcess").kill();
 			player.setPlayerKey("playerProcess",undefined);
+			if(platform==="windows"){
+				child_process.exec("taskkill -f -im wscript.exe");
+			}
 		}
 	}
 }
