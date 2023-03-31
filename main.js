@@ -144,9 +144,10 @@ function createPlayer(){
 	return playerCommands;
 }
 function shutdown(){
-	console.log("Stopping playback ...");
-	for(const player of players){
+	for(const playerId of Object.keys(players)){
+		const player=players[playerId];
 		if(player.getPlayerKey("isPlaying")){
+			console.log("Stopping playback "+playerId+" ...");
 			player.setPlayerKey("isPlaying",false);
 			player.getPlayerKey("playerProcess").kill();
 			player.setPlayerKey("playerProcess",undefined);
