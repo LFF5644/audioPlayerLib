@@ -21,7 +21,7 @@ console.log(player.getPlayerKey("tracks"));
 player.play();
 
 setTimeout(player.stop,1e4);
-setInervall(()=>{
+setInterval(()=>{
 	const isPlaying=player.getPlayerKey("isPlaying");
 	console.log(isPlaying?"Wiedergabe Läuft ...":"Keine Wiedergabe!");
 },1e3)
