@@ -73,7 +73,7 @@ function play(id){
 			}
 		});
 		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
-			process.stdout.write(buffer);
+			//process.stdout.write(buffer);
 		});
 	}
 }
