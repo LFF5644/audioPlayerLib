@@ -29,7 +29,6 @@ function play(id){
 	}
 	player.setPlayerKey("isPlaying",true);
 	const src=player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")];
-	player.setPlayerKey("srcPlaying",src);
 	if(platform==="windows"){
 		throw new Error("Windows is not allowed ....");
 	}
@@ -74,7 +73,6 @@ function pause(id){
 		player.setPlayerKey("isPlaying",false);
 		player.getPlayerKey("playerProcess").kill();
 		player.setPlayerKey("playerProcess",undefined);
-		player.setPlayerKey("srcPlaying",null);
 	}
 	
 }
@@ -111,7 +109,6 @@ function createPlayer(){
 	players[id]={
 		...playerCommands,
 		isPlaying: false,
-		srcPlaying: null,
 		trackIndex: 0,
 		tracks:[],
 		setPlayer:()=> setPlayer(id),
