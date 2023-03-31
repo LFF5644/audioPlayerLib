@@ -71,9 +71,6 @@ function play(id){
 				player.nextTrack();
 			}
 		});
-		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
-			process.stdout.write(buffer);
-		});
 	}
 }
 function nextTrack(id){
