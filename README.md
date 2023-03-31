@@ -4,13 +4,13 @@ a audio player in nodejs for linux
 you need nodejs and for linux you need [`mplayer`](http://www.mplayerhq.hu/design7/news.html) at `/usr/bin/mplayer`
 
 than you can simply type in a other project
-`npm install git+ssh://git@github.com:LFF5644/audioPlayerLib.git`
+`npm install audio-player-lib`
 
 than you can use the package
 
 ```
-const audio=require("audioPlayerLib");
-const player=audio.createPlayer();
+const audioPlayerLib=require("audio-player-lib");
+const player=audioPlayerLib.createPlayer();
 
 player.addTrack({
 	name: "Song",	// optional
