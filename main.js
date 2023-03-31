@@ -9,6 +9,7 @@ const platform=process.platform==="win32"?"windows":process.platform;
 
 function addTrack(id,object){
 	const player=players[id];
+	if(typeof(object)==="string"){object={src:object}}
 	const track={
 		...trackTemplate,
 		...object,
