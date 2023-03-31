@@ -59,9 +59,6 @@ function play(id){
 				player.nextTrack();
 			}
 		}));
-		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
-			process.stdout.write(buffer);
-		});
 	}
 	else{
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
@@ -74,6 +71,9 @@ function play(id){
 				player.setPlayerKey("isPlaying",false);
 				player.nextTrack();
 			}
+		});
+		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
+			process.stdout.write(buffer);
 		});
 	}
 }
