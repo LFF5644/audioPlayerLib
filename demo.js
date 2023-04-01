@@ -4,9 +4,9 @@ const player=audioPlayerLib.createPlayer();
 const [node, thisFile, ...tracks]=process.argv;
 
 if(tracks.length===0){
-	const examplePath=process.platform==="win32"?"C:\\path\\to\\musik\\file\\":"/path/to/file/";
+	const examplePath=process.platform==="win32"?"C:\\path\\to\\Musik\\File\\":"/path/to/Musik/File/";
 	console.log("Keine Tracks mit gegeben!");
-	console.log(`${node} ${thisFile.includes(" ")?'"'+thisFile+'"':thisFile} "${examplePath+"datei1.mp3"}" "${examplePath+"datei2.mp3"}"`);
+	console.log(`${node} ${thisFile.includes(" ")?'"'+thisFile+'"':thisFile} "${examplePath+"Datei1.mp3"}" "${examplePath+"Datei2.mp3"}"`);
 	process.exit(1);
 }
 
