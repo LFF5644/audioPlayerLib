@@ -53,9 +53,12 @@ function play(id){
 		`.split("\t").join(""));
 		player.setPlayerKey("playerProcess",child_process.exec("start \"\" /wait C:\\Windows\\System32\\wscript.exe "+fileName,(error,stdout,stderr)=>{
 			child_process.exec(`del /Q /F "${fileName}"`);
-			player.setPlayerKey("playerProcess",undefined);
-			if(player.getPlayerKey("isPlaying")){
-				player.setPlayerKey("isPlaying",false);
+			console.log("wscript exit code "+code+" and signal "+signal);
+			player.setPlayerKey("isPlaying",false);
+			if(
+				signal==="SIGUSR1"&&
+				code===null
+			){
 				player.nextTrack();
 			}
 		}));
@@ -66,9 +69,17 @@ function play(id){
 		]));
 		player.getPlayerKey("playerProcess").on("exit",(code,signal)=>{
 			console.log("mplayer exit code "+code+" and signal "+signal);
-			player.setPlayerKey("playerProcess",undefined);
-			if(player.getPlayerKey("isPlaying")){
-				player.setPlayerKey("isPlaying",false);
+			player.setPlayerKey("isPlaying",false);
+			if(
+				signal==="SIGUSR1"&&
+				code===null
+			){
+				player.nextTrack();
+			}
+			else if(
+				signal===null&&
+				code===0
+			){
 				player.nextTrack();
 			}
 		});
@@ -79,14 +90,6 @@ function play(id){
 }
 function nextTrack(id){
 	const player=players[id];
-	if(player.getPlayerKey("isPlaying")){
-		player.setPlayerKey("isPlaying",false);
-		player.getPlayerKey("playerProcess").kill();
-		player.setPlayerKey("playerProcess",undefined);
-		if(platform==="windows"){
-			child_process.exec("taskkill -f -im wscript.exe");
-		}
-	}
 	const tracks=player.getPlayerKey("tracks");
 	let trackIndex=player.getPlayerKey("trackIndex");
 	const tracksLength=tracks.length-1;
@@ -97,26 +100,35 @@ function nextTrack(id){
 		trackIndex=0;
 	}
 
-	player.setPlayerKey("trackIndex",trackIndex);
-	player.play();
+	if(player.getPlayerKey("isPlaying")){
+		trackIndex-=1;
+		player.setPlayerKey("trackIndex",trackIndex);
+		player.killProcess("SIGUSR1");
+	}else{
+		player.setPlayerKey("trackIndex",trackIndex);
+		player.play();
+	}
 }
 function pause(id){
 	const player=players[id];
 	if(player.getPlayerKey("isPlaying")){
 		player.setPlayerKey("isPlaying",false);
-		player.getPlayerKey("playerProcess").kill();
-		player.setPlayerKey("playerProcess",undefined);
+		player.killProcess();
 		if(platform==="windows"){
 			child_process.exec("taskkill -f -im wscript.exe");
 		}
 	}
-	
+}
+function killProcess(id,signal="SIGINT"){
+	const player=players[id];
+	try{
+		player.getPlayerKey("playerProcess").kill(signal);
+	}catch(e){}
+	player.setPlayerKey("playerProcess",null);
 }
 function stop(id){
 	const player=players[id];
-	if(player.getPlayerKey("isPlaying")){
-		player.pause();
-	}
+	player.pause();
 	player.setPlayerKey("trackIndex",0);
 }
 function getPlayer(id){
@@ -145,8 +157,10 @@ function createPlayer(){
 	players[id]={
 		...playerCommands,
 		isPlaying: false,
+		playerProcess: null,
 		trackIndex: 0,
 		tracks:[],
+		killProcess: signal=> killProcess(id,signal),
 		setPlayer:()=> setPlayer(id),
 		setPlayerKey: (key,value)=> setPlayerKey(id,key,value),
 
@@ -156,15 +170,7 @@ function createPlayer(){
 function shutdown(){
 	for(const playerId of Object.keys(players)){
 		const player=players[playerId];
-		if(player.getPlayerKey("isPlaying")){
-			console.log("Stopping playback "+playerId+" ...");
-			player.setPlayerKey("isPlaying",false);
-			player.getPlayerKey("playerProcess").kill();
-			player.setPlayerKey("playerProcess",undefined);
-			if(platform==="windows"){
-				child_process.exec("taskkill -f -im wscript.exe");
-			}
-		}
+		player.killProcess();
 	}
 }
 
