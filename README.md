@@ -24,5 +24,5 @@ setTimeout(player.stop,1e4);
 setInterval(()=>{
 	const isPlaying=player.getPlayerKey("isPlaying");
 	console.log(isPlaying?"Wiedergabe Läuft ...":"Keine Wiedergabe!");
-},1e3)
+},1e3);
 ```
