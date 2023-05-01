@@ -1,15 +1,30 @@
 const child_process=require("child_process");
 const fs=require("fs");
-const players={};
+const players=new Map();
 const trackTemplate={
 	id: null,
 	name: null,
 	src: null,
 };
 const platform=process.platform==="win32"?"windows":process.platform;
+const optionsTemplate={
+	repeat: "all",
+	onEnd: (track,end)=>{
+		//console.log("Played: "+(track.name?track.name:track.src));
+		if(end){
+			console.log("Playback finished!");
+		}
+	},
+	onPlay: track=>{
+		console.log("Playing: "+(track.name?track.name:track.src));
+	},
+	onAddTrack: track=>{
+		//console.log("Add to Playback list: "+(track.name?entry.name:track.src));
+	}
+};
 
 function addTrack(id,object){
-	const player=players[id];
+	const player=getPlayer(id);
 	if(typeof(object)==="string"){object={src:object}}
 	const track={
 		...trackTemplate,
@@ -18,13 +33,15 @@ function addTrack(id,object){
 	};
 	if(!track.id) return;
 
+	if(player.onAddTrack(track)===false) return;
+
 	player.setPlayerKey("tracks",[
 		...player.getPlayerKey("tracks"),
 		track,
 	]);
 }
 function play(id){
-	const player=players[id];
+	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
 		return false;
 	}
@@ -38,7 +55,10 @@ function play(id){
 	const trackIndex=player.getPlayerKey("trackIndex");
 	const track=tracks[trackIndex];
 
-	console.log(`Playing: ${track.name?track.name:track.src}`);
+	if(player.onPlay(track)===false){
+		player.onEnd(track,true);
+		return;
+	};
 
 	if(platform==="windows"){
 		const fileName=`_player_${Date.now()}.vbs`
@@ -55,20 +75,6 @@ function play(id){
 			child_process.exec(`del /Q /F "${fileName}"`);
 			console.log("wscript exit code "+code+" and signal "+signal);
 			player.setPlayerKey("isPlaying",false);
-			if(
-				signal==="SIGUSR1"&&
-				code===null
-			){
-				player.nextTrack();
-			}
-		}));
-	}
-	else{
-		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
-			track.src,"-softvol","-softvol-max","90",
-		]));
-		player.getPlayerKey("playerProcess").on("exit",(code,signal)=>{
-			console.log("mplayer exit code "+code+" and signal "+signal);
 			player.setPlayerKey("isPlaying",false);
 			if(
 				signal==="SIGUSR1"&&
@@ -82,6 +88,33 @@ function play(id){
 			){
 				player.nextTrack();
 			}
+			else{
+				player.onEnd(track,true);
+			}
+		}));
+	}
+	else{
+		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
+			track.src,"-softvol","-softvol-max","90",
+		]));
+		player.getPlayerKey("playerProcess").on("exit",(code,signal)=>{
+			//console.log("mplayer exit code "+code+" and signal "+signal);
+			player.setPlayerKey("isPlaying",false);
+			if(
+				signal==="SIGUSR1"&&
+				code===null
+			){
+				player.nextTrack();
+			}
+			else if(
+				signal===null&&
+				code===0
+			){
+				player.nextTrack();
+			}
+			else{
+				player.onEnd(track,true);
+			}
 		});
 		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
 			//process.stdout.write(buffer);
@@ -89,14 +122,18 @@ function play(id){
 	}
 }
 function nextTrack(id){
-	const player=players[id];
+	const player=getPlayer(id);
 	const tracks=player.getPlayerKey("tracks");
 	let trackIndex=player.getPlayerKey("trackIndex");
 	const tracksLength=tracks.length-1;
 
-	trackIndex+=1;
+	if(player.repeat!=="track") trackIndex+=1;
 
 	if(trackIndex>tracksLength){
+		if(player.repeat==="nothing"){
+			player.onEnd(player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")],true);
+			return;
+		}
 		trackIndex=0;
 	}
 
@@ -105,12 +142,13 @@ function nextTrack(id){
 		player.setPlayerKey("trackIndex",trackIndex);
 		player.killProcess("SIGUSR1");
 	}else{
+		player.onEnd(player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")],false);
 		player.setPlayerKey("trackIndex",trackIndex);
 		player.play();
 	}
 }
 function pause(id){
-	const player=players[id];
+	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
 		player.setPlayerKey("isPlaying",false);
 		player.killProcess();
@@ -120,30 +158,49 @@ function pause(id){
 	}
 }
 function killProcess(id,signal="SIGINT"){
-	const player=players[id];
+	const player=getPlayer(id);
 	try{
 		player.getPlayerKey("playerProcess").kill(signal);
 	}catch(e){}
 	player.setPlayerKey("playerProcess",null);
 }
 function stop(id){
-	const player=players[id];
+	const player=getPlayer(id);
 	player.pause();
 	player.setPlayerKey("trackIndex",0);
 }
 function getPlayer(id){
-	return players[id];
+	//return getPlayer(id);
+	return players.get(id);
 }
 function getPlayerKey(id,key){
-	return players[id][key];
+	//return getPlayer(id)[key];
+	return players.get(id)[key];
 }
 function setPlayer(id,object){
-	players[id]=object;
+	//getPlayer(id)=object;
+	players.set(id,object);
+}
+function addPlayerKeys(id,object){
+	players.set(id,{
+		...players.get(id),
+		...object,
+	});
 }
 function setPlayerKey(id,key,value){
-	players[id][key]=value;
+	//getPlayer(id)[key]=value;
+	players.set(id,{
+		...players.get(id),
+		[key]: value,
+	});
 }
-function createPlayer(){
+function createPlayer(options){
+
+	options=!options?optionsTemplate:{
+		...optionsTemplate,
+		...options,
+	};
+
 	const id=Date.now();
 	const playerCommands={
 		addTrack: track=> addTrack(id,track),
@@ -154,22 +211,23 @@ function createPlayer(){
 		play:()=> play(id),
 		stop:()=> stop(id),
 	};
-	players[id]={
+	setPlayer(id,{
+		...options,
 		...playerCommands,
 		isPlaying: false,
 		playerProcess: null,
 		trackIndex: 0,
 		tracks:[],
+		addPlayerKeys: object=> addPlayerKeys(id,object),
 		killProcess: signal=> killProcess(id,signal),
-		setPlayer:()=> setPlayer(id),
+		setPlayer: object=> setPlayer(id,object),
 		setPlayerKey: (key,value)=> setPlayerKey(id,key,value),
 
-	};
+	});
 	return playerCommands;
 }
 function shutdown(){
-	for(const playerId of Object.keys(players)){
-		const player=players[playerId];
+	for(const player of players.entries()){
 		player.killProcess();
 	}
 }
