@@ -2,9 +2,11 @@ const child_process=require("child_process");
 const fs=require("fs");
 const players=new Map();
 const trackTemplate={
+	album: null,
 	id: null,
 	name: null,
 	src: null,
+	trackNumber: null,
 };
 const platform=process.platform==="win32"?"windows":process.platform;
 const optionsTemplate={
@@ -40,7 +42,67 @@ function addTrack(id,object){
 		track,
 	]);
 }
-function play(id){
+function play(id,object=null){
+	const player=getPlayer(id);
+	if(!object) return player.startPlayback();
+
+	let trackIndex=-2;
+	
+	if(object.name){
+		trackIndex=player.tracks.findIndex(item=>item.name===object.name);
+	}
+	else if(object.src){
+		trackIndex=player.tracks.findIndex(item=>item.src===object.src);
+	}
+	else if(object.album){
+		const inAlbum=(player.tracks
+			.map((item,index)=>item.album!==object.album?null:{
+				...item,
+				index,
+			})
+			.filter(Boolean)	// {...} -> true; null -> false
+		);
+		if(inAlbum.length===0) throw new Error("Album '"+object.album+"' not found!");
+		
+		if(!object.trackNumber||object.trackNumber==1){
+			const indexToSearch=inAlbum.findIndex(item=>item.trackNumber===1);
+			if(indexToSearch===-1){
+				trackIndex=inAlbum[0].index;
+			}
+			else{
+				trackIndex=inAlbum[indexToSearch].index;
+			}
+		}
+		else{
+			const indexToSearch=inAlbum.findIndex(item=>item.trackNumber===object.trackNumber);
+			if(indexToSearch===-1){
+				console.log(`Album "${object.album} don't hast track number ${object.trackNumber}"`);
+				console.log(`Album "${object.album}" tracks: ${player.tracks
+					.map((item,index)=>item.album!==object.album?null:{
+						...item,
+						index,
+					})
+					.filter(Boolean)
+					.filter(item=>item.trackNumber!==null)
+					.map(item=>item.trackNumber)
+					.join(", ")
+				}`);
+				trackIndex=inAlbum[0].index;
+			}
+			else{
+				trackIndex=inAlbum[indexToSearch].index;
+			}
+		}
+
+	}
+
+	if(trackIndex===-1) throw new Error("track not found!");
+	else if(trackIndex===-2) throw new Error("wrong method!");
+	else{
+		player.setPlayerKey("trackIndex",trackIndex);
+	}
+}
+function startPlayback(id){
 	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
 		return false;
@@ -144,7 +206,7 @@ function nextTrack(id){
 	}else{
 		player.onEnd(player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")],false);
 		player.setPlayerKey("trackIndex",trackIndex);
-		player.play();
+		player.startPlayback();
 	}
 }
 function pause(id){
@@ -152,9 +214,6 @@ function pause(id){
 	if(player.getPlayerKey("isPlaying")){
 		player.setPlayerKey("isPlaying",false);
 		player.killProcess();
-		if(platform==="windows"){
-			child_process.exec("taskkill -f -im wscript.exe");
-		}
 	}
 }
 function killProcess(id,signal="SIGINT"){
@@ -163,6 +222,9 @@ function killProcess(id,signal="SIGINT"){
 		player.getPlayerKey("playerProcess").kill(signal);
 	}catch(e){}
 	player.setPlayerKey("playerProcess",null);
+	if(platform==="windows"){
+		child_process.exec("taskkill -f -im wscript.exe");
+	}
 }
 function stop(id){
 	const player=getPlayer(id);
@@ -208,7 +270,8 @@ function createPlayer(options){
 		getPlayerKey: key=> getPlayerKey(id,key),
 		nextTrack:()=> nextTrack(id),
 		pause:()=> pause(id),
-		play:()=> play(id),
+		play: object=> play(id,object),
+		startPlayback:()=> startPlayback(id),
 		stop:()=> stop(id),
 	};
 	setPlayer(id,{
@@ -227,7 +290,8 @@ function createPlayer(options){
 	return playerCommands;
 }
 function shutdown(){
-	for(const player of players.entries()){
+	for(const [id,player] of players.entries()){
+		console.log("Stopping player "+id);
 		player.killProcess();
 	}
 }
@@ -239,4 +303,5 @@ process.on('SIGUSR2',shutdown);
 
 module.exports={
 	createPlayer,
+	getPlayer: players.get,
 };
