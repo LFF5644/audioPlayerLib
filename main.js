@@ -3,6 +3,7 @@ const fs=require("fs");
 const players=new Map();
 const trackTemplate={
 	album: null,
+	discNumber: null,
 	id: null,
 	name: null,
 	src: null,
@@ -11,11 +12,8 @@ const trackTemplate={
 const platform=process.platform==="win32"?"windows":process.platform;
 const optionsTemplate={
 	repeat: "all",
-	onEnd: (track,end)=>{
-		//console.log("Played: "+(track.name?track.name:track.src));
-		if(end){
-			console.log("Playback finished!");
-		}
+	onEnd: track=>{
+		console.log("Played: "+(track.name?track.name:track.src));
 	},
 	onPlay: track=>{
 		console.log("Playing: "+(track.name?track.name:track.src));
@@ -44,7 +42,14 @@ function addTrack(id,object){
 }
 function play(id,object=null){
 	const player=getPlayer(id);
-	if(!object) return player.startPlayback();
+	if(typeof(object)!=="object"){
+		const res=player.startPlayback(object);
+		return res;
+	}
+	else if(object===null){
+		const res=player.startPlayback();
+		return res;
+	}
 
 	let trackIndex=-2;
 	
@@ -98,32 +103,34 @@ function play(id,object=null){
 
 	if(trackIndex===-1) throw new Error("track not found!");
 	else if(trackIndex===-2) throw new Error("wrong method!");
-	else{
-		player.setPlayerKey("trackIndex",trackIndex);
-	}
+
+	player.startPlayback(trackIndex);
+	return trackIndex;
 }
-function startPlayback(id){
+function startPlayback(id,index=-1){
 	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
-		return false;
+		if(index==-1) return false;
+		player.killProcess();
 	}
-	player.setPlayerKey("isPlaying",true);
 
 	const tracks=player.getPlayerKey("tracks");
 	if(tracks.length===0){
 		console.warn("Keine Wiedergabe möglich Warteschlange leer!");
 		return;
 	}
-	const trackIndex=player.getPlayerKey("trackIndex");
+	if(index!==-1) player.setPlayerKey("trackIndex",index);
+	const trackIndex=index!==-1?index:false||player.getPlayerKey("trackIndex");
 	const track=tracks[trackIndex];
 
 	if(player.onPlay(track)===false){
-		player.onEnd(track,true);
 		return;
 	};
+	player.setPlayerKey("isPlaying",true);
 
 	if(platform==="windows"){
-		const fileName=`_player_${Date.now()}.vbs`
+		throw new Error("PLATFORM WINDOWS NOT SUPPORTED!");
+		/*const fileName=`_player_${Date.now()}.vbs`
 		fs.writeFileSync(fileName,`\
 			Set Sound=CreateObject("WMPlayer.OCX.7")
 			Sound.URL="${track.src}"
@@ -151,9 +158,9 @@ function startPlayback(id){
 				player.nextTrack();
 			}
 			else{
-				player.onEnd(track,true);
+				player.onEnd(track);
 			}
-		}));
+		}));*/
 	}
 	else{
 		player.setPlayerKey("playerProcess",child_process.spawn("/usr/bin/mplayer",[
@@ -161,21 +168,35 @@ function startPlayback(id){
 		]));
 		player.getPlayerKey("playerProcess").on("exit",(code,signal)=>{
 			//console.log("mplayer exit code "+code+" and signal "+signal);
-			player.setPlayerKey("isPlaying",false);
 			if(
-				signal==="SIGUSR1"&&
-				code===null
+				(
+					signal===null||
+					signal==="SIGUSR1"
+				)&&(
+					code===null||
+					code===0
+				)
 			){
-				player.nextTrack();
-			}
-			else if(
-				signal===null&&
-				code===0
-			){
-				player.nextTrack();
+				const tracks=player.getPlayerKey("tracks");
+				const tracksLength=tracks.length-1;
+				let trackIndex=player.getPlayerKey("trackIndex");
+
+				if(player.repeat!=="track") trackIndex+=1;
+
+				if(trackIndex>tracksLength){
+					if(player.repeat==="nothing"){
+						player.setPlayerKey("isPlaying",false);
+						player.setPlayerKey("playerProcess",null);
+						player.onEnd(tracks[trackIndex]);
+						return;
+					}
+					trackIndex=0;
+				}
+
+				player.startPlayback(trackIndex);
 			}
 			else{
-				player.onEnd(track,true);
+				console.log("mplayer exit code "+code+" and signal "+signal);
 			}
 		});
 		player.getPlayerKey("playerProcess").stdout.on("data",buffer=>{
@@ -185,34 +206,35 @@ function startPlayback(id){
 }
 function nextTrack(id){
 	const player=getPlayer(id);
-	const tracks=player.getPlayerKey("tracks");
+
+	if(player.getPlayerKey("isPlaying")) player.killProcess("SIGUSR1");
+	else{
+		const tracksLength=player.getPlayerKey("tracks").length-1;
+		let trackIndex=player.getPlayerKey("trackIndex");
+		
+		trackIndex+=1;
+		if(trackIndex>tracksLength) trackIndex=0;
+
+		player.startPlayback(trackIndex);
+	}
+}
+function previousTrack(id){
+	const player=getPlayer(id);
+
+	const tracksLength=player.getPlayerKey("tracks").length-1;
 	let trackIndex=player.getPlayerKey("trackIndex");
-	const tracksLength=tracks.length-1;
 
-	if(player.repeat!=="track") trackIndex+=1;
+	trackIndex-=1;
 
-	if(trackIndex>tracksLength){
-		if(player.repeat==="nothing"){
-			player.onEnd(player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")],true);
-			return;
-		}
-		trackIndex=0;
-	}
+	if(trackIndex<0) trackIndex=tracksLength;
 
-	if(player.getPlayerKey("isPlaying")){
-		trackIndex-=1;
-		player.setPlayerKey("trackIndex",trackIndex);
-		player.killProcess("SIGUSR1");
-	}else{
-		player.onEnd(player.getPlayerKey("tracks")[player.getPlayerKey("trackIndex")],false);
-		player.setPlayerKey("trackIndex",trackIndex);
-		player.startPlayback();
-	}
+	if(player.getPlayerKey("isPlaying")) player.killProcess();
+
+	player.play(trackIndex);
 }
 function pause(id){
 	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
-		player.setPlayerKey("isPlaying",false);
 		player.killProcess();
 	}
 }
@@ -222,6 +244,7 @@ function killProcess(id,signal="SIGINT"){
 		player.getPlayerKey("playerProcess").kill(signal);
 	}catch(e){}
 	player.setPlayerKey("playerProcess",null);
+	player.setPlayerKey("isPlaying",false);
 	if(platform==="windows"){
 		child_process.exec("taskkill -f -im wscript.exe");
 	}
@@ -257,7 +280,6 @@ function setPlayerKey(id,key,value){
 	});
 }
 function createPlayer(options){
-
 	options=!options?optionsTemplate:{
 		...optionsTemplate,
 		...options,
@@ -271,10 +293,11 @@ function createPlayer(options){
 		nextTrack:()=> nextTrack(id),
 		pause:()=> pause(id),
 		play: object=> play(id,object),
-		startPlayback:()=> startPlayback(id),
+		previousTrack:()=> previousTrack(id),
+		startPlayback: object=> startPlayback(id,object),
 		stop:()=> stop(id),
 	};
-	setPlayer(id,{
+	const player={
 		...options,
 		...playerCommands,
 		isPlaying: false,
@@ -286,8 +309,13 @@ function createPlayer(options){
 		setPlayer: object=> setPlayer(id,object),
 		setPlayerKey: (key,value)=> setPlayerKey(id,key,value),
 
-	});
-	return playerCommands;
+	};
+	setPlayer(id,player);
+	return(
+		process.env.musikPlayerDEBUG
+		?	player
+		:	playerCommands
+	);
 }
 function shutdown(){
 	for(const [id,player] of players.entries()){
@@ -303,5 +331,4 @@ process.on('SIGUSR2',shutdown);
 
 module.exports={
 	createPlayer,
-	getPlayer: players.get,
 };
