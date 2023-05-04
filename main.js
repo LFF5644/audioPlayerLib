@@ -60,7 +60,7 @@ function play(id,object=null){
 		trackIndex=player.tracks.findIndex(item=>item.src===object.src);
 	}
 	else if(object.album){
-		const inAlbum=(player.tracks
+		let inAlbum=(player.tracks
 			.map((item,index)=>item.album!==object.album?null:{
 				...item,
 				index,
@@ -69,6 +69,14 @@ function play(id,object=null){
 		);
 		if(inAlbum.length===0) throw new Error("Album '"+object.album+"' not found!");
 		
+		if(inAlbum.some(item=>typeof(item.discNumber)==="number"&&item.discNumber>0)){
+			let requiredDiscNumber=1;
+			if(!object.discNumber) requiredDiscNumber=inAlbum.find(item=>typeof(item.discNumber)==="number"&&item.discNumber>0).discNumber;
+			else if(object.discNumber) requiredDiscNumber=object.discNumber;
+
+			inAlbum=inAlbum.filter(item=>item.discNumber===requiredDiscNumber);
+		}
+
 		if(!object.trackNumber||object.trackNumber==1){
 			const indexToSearch=inAlbum.findIndex(item=>item.trackNumber===1);
 			if(indexToSearch===-1){
@@ -81,7 +89,7 @@ function play(id,object=null){
 		else{
 			const indexToSearch=inAlbum.findIndex(item=>item.trackNumber===object.trackNumber);
 			if(indexToSearch===-1){
-				console.log(`Album "${object.album} don't hast track number ${object.trackNumber}"`);
+				console.log(`Album "${object.album}" don't hast track number "${object.trackNumber}"`);
 				console.log(`Album "${object.album}" tracks: ${player.tracks
 					.map((item,index)=>item.album!==object.album?null:{
 						...item,
