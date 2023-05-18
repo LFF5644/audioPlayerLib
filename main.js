@@ -1,6 +1,26 @@
 const child_process=require("child_process");
-const fs=require("fs");
+const socketIo=require("socket.io");
+
+const DEBUG=Boolean(process.env.audioPlayerLib_DEBUG);
+const platform=process.platform==="win32"?"windows":process.platform;
 const players=new Map();
+
+const optionsTemplate={
+	socketPort: null,
+	repeat: "all",
+	onEnd: track=>{
+		console.log("Played: "+(track.name?track.name:track.src));
+	},
+	onPlay: track=>{
+		console.log(`Playing ${track.album?("Album: "+track.album+", "):""}${track.discNumber!==null?("Disc: "+track.discNumber+", "):null} Track: ${track.name?track.name:track.src}`);
+	},
+	onAddTrack: track=>{
+		//console.log("Add to Playback list: "+(track.name?entry.name:track.src));
+	},
+	onPause: ()=>{
+
+	},
+};
 const trackTemplate={
 	album: null,
 	discNumber: null,
@@ -8,19 +28,6 @@ const trackTemplate={
 	name: null,
 	src: null,
 	trackNumber: null,
-};
-const platform=process.platform==="win32"?"windows":process.platform;
-const optionsTemplate={
-	repeat: "all",
-	onEnd: track=>{
-		console.log("Played: "+(track.name?track.name:track.src));
-	},
-	onPlay: track=>{
-		console.log("Playing: "+(track.name?track.name:track.src));
-	},
-	onAddTrack: track=>{
-		//console.log("Add to Playback list: "+(track.name?entry.name:track.src));
-	}
 };
 
 function addTrack(id,object){
@@ -135,7 +142,7 @@ function startPlayback(id,index=-1){
 		return;
 	};
 	player.setPlayerKey("isPlaying",true);
-
+	if(player.socketServer) player.sendCurrentlyPlaying();
 	if(platform==="windows"){
 		throw new Error("PLATFORM WINDOWS NOT SUPPORTED!");
 		/*const fileName=`_player_${Date.now()}.vbs`
@@ -244,6 +251,8 @@ function pause(id){
 	const player=getPlayer(id);
 	if(player.getPlayerKey("isPlaying")){
 		player.killProcess();
+		if(player.socketServer) player.sendCurrentlyPlaying();
+		if(player.onPause) player.onPause();
 	}
 }
 function killProcess(id,signal="SIGINT"){
@@ -287,6 +296,50 @@ function setPlayerKey(id,key,value){
 		[key]: value,
 	});
 }
+function createSocketServer(id,port){
+	const {
+		getPlayerKey,
+		nextTrack,
+		pause,
+		play,
+		previousTrack,
+		sendCurrentlyPlaying,
+		setPlayerKey,
+		stop,
+	}=getPlayer(id);
+
+	const socketServer=new socketIo.Server(port,{cors:{origin:"*"}});
+	socketServer.on("connection",socket=>{
+		socket.on("get-trackIndex",()=>{
+			socket.emit("set-trackIndex",getPlayerKey("trackIndex"));
+		});
+		socket.on("get-tracks",()=>{
+			socket.emit("set-tracks",getPlayerKey("tracks"));
+		});
+		socket.on("set-playback",playerArgs=>{
+			play(playerArgs);
+		});
+		socket.on("action-playback",action=>{
+			if(action==="pause") pause();
+			else if(action==="stop") stop();
+			else if(action==="nextTrack") nextTrack();
+			else if(action==="previousTrack") previousTrack();
+		});
+		sendCurrentlyPlaying();
+	});
+	return socketServer;
+}
+function sendCurrentlyPlaying(id){
+	const {
+		getPlayerKey,
+		socketServer,
+	}=getPlayer(id);
+	socketServer.emit("currentlyPlaying",{
+		trackIndex: getPlayerKey("trackIndex"),
+		isPlaying: getPlayerKey("isPlaying"),
+		track: getPlayerKey("tracks")[getPlayerKey("trackIndex")],
+	});
+}
 function createPlayer(options){
 	options=!options?optionsTemplate:{
 		...optionsTemplate,
@@ -310,17 +363,24 @@ function createPlayer(options){
 		...playerCommands,
 		isPlaying: false,
 		playerProcess: null,
+		socketServer: null,
 		trackIndex: 0,
 		tracks:[],
 		addPlayerKeys: object=> addPlayerKeys(id,object),
 		killProcess: signal=> killProcess(id,signal),
+		sendCurrentlyPlaying:()=> sendCurrentlyPlaying(id),
 		setPlayer: object=> setPlayer(id,object),
 		setPlayerKey: (key,value)=> setPlayerKey(id,key,value),
 
 	};
 	setPlayer(id,player);
+	if(options.socketPort){
+		const socketServer=createSocketServer(id,options.socketPort);
+		player.setPlayerKey("socketServer",socketServer);
+		player.socketPort=socketServer;
+	}
 	return(
-		process.env.musikPlayerDEBUG
+		DEBUG
 		?	player
 		:	playerCommands
 	);
