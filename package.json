@@ -4,7 +4,8 @@
 	"description": "audio player lib",
 	"main": "main.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"install": "sudo apt install mplayer -y",
+		"uninstall": "sudo apt remove mplayer -y; sudo apt autoremove -y"
 	},
 	"repository": {
 		"type": "git",
@@ -21,5 +22,8 @@
 	"bugs": {
 		"url": "https://github.com/LFF5644/audioPlayerLib/issues"
 	},
-	"homepage": "https://github.com/LFF5644/audioPlayerLib#readme"
+	"homepage": "https://github.com/LFF5644/audioPlayerLib#readme",
+	"dependencies": {
+		"socket.io": "^4.6.1"
+	}
 }
