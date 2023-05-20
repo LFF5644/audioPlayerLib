@@ -36,7 +36,7 @@ function addTrack(id,object){
 	const track={
 		...trackTemplate,
 		...object,
-		id: Date.now(),
+		id: String(Math.random()+""+Date.now()).substring(2).toString(36),
 	};
 	if(!track.id) return;
 
@@ -316,14 +316,17 @@ function createSocketServer(id,port){
 		socket.on("get-tracks",()=>{
 			socket.emit("set-tracks",getPlayerKey("tracks"));
 		});
-		socket.on("set-playback",playerArgs=>{
-			play(playerArgs);
+		socket.on("set-playback",(playerArgs,callback=()=>{})=>{
+			callback(play(playerArgs));
 		});
-		socket.on("action-playback",action=>{
-			if(action==="pause") pause();
-			else if(action==="stop") stop();
-			else if(action==="nextTrack") nextTrack();
-			else if(action==="previousTrack") previousTrack();
+		socket.on("action-playback",(action,callback=()=>{})=>{
+			let result;
+			if(action==="pause") result=pause();
+			else if(action==="stop") result=stop();
+			else if(action==="nextTrack") result=nextTrack();
+			else if(action==="previousTrack") result=previousTrack();
+			else result="error";
+			callback(result);
 		});
 		sendCurrentlyPlaying();
 	});
